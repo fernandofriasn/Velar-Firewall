@@ -105,40 +105,6 @@ apt-get install -y -qq \
     linux-headers-$(uname -r) 2>/dev/null || true
 ok "Paquetes base instalados"
 
-# ═════════════════════════════════════════════════════════
-header "2. Docker"
-# ═════════════════════════════════════════════════════════
-
-if ! command -v docker &>/dev/null; then
-    info "Instalando Docker..."
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/debian/gpg | \
-        gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
-    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" \
-        > /etc/apt/sources.list.d/docker.list
-    apt-get update -qq
-    apt-get install -y -qq \
-        containerd.io docker-ce docker-ce-cli \
-        docker-buildx-plugin docker-compose-plugin
-    systemctl enable docker
-    ok "Docker instalado"
-else
-    ok "Docker ya instalado: $(docker --version)"
-fi
-
-# ═════════════════════════════════════════════════════════
-header "3. Node.js 20 LTS"
-# ═════════════════════════════════════════════════════════
-
-if ! command -v node &>/dev/null; then
-    info "Instalando Node.js 20 LTS..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - 2>/dev/null
-    apt-get install -y -qq nodejs
-    ok "Node.js $(node --version) instalado"
-else
-    ok "Node.js ya instalado: $(node --version)"
-fi
 
 # ═════════════════════════════════════════════════════════
 header "4. KEA DHCP 2.4.x (repositorio ISC)"
