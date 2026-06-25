@@ -106,7 +106,7 @@ header "1. Paquetes del sistema"
 apt-get update -qq
 apt-get install -y -qq \
     curl wget gnupg2 ca-certificates lsb-release \
-    python3 python3-pip python3-venv python3-dev python3-psutil \
+    python3 python3-pip python3-venv python3-dev python3-psutil python3-yaml \
     build-essential git autoconf automake libtool pkg-config cmake \
     nftables \
     wireguard wireguard-tools \
@@ -238,8 +238,16 @@ fi
 
 info "Descargando reglas Emerging Threats..."
 mkdir -p /usr/local/etc/suricata/rules /usr/local/var/log/suricata /usr/local/var/run
-suricata-update update-sources --no-reload 2>/dev/null || true
-suricata-update --no-reload 2>/dev/null || true
+
+# Verificación defensiva — suricata-update necesita PyYAML para leer
+# su config de fuentes. Ya se instala como python3-yaml en la sección 1,
+# pero si por algo no quedó disponible, lo forzamos aquí también.
+python3 -c "import yaml" 2>/dev/null || \
+    pip3 install pyyaml --break-system-packages -q 2>/dev/null || \
+    apt-get install -y -qq python3-yaml
+
+suricata-update update-sources --no-reload || warn "suricata-update update-sources falló — revisa conectividad/pyyaml"
+suricata-update --no-reload || warn "suricata-update falló — reglas no descargadas, revisa el error arriba"
 ok "Reglas descargadas"
 
 cat > /etc/systemd/system/suricata.service << 'SUREOF'
