@@ -38,25 +38,24 @@ echo
 # ── Configuración interactiva ─────────────────────────────
 header "Configuración de red"
 
-read -p "  Interfaz WAN (ej: eth0, ens18): " WAN_IFACE
-read -p "  Interfaz LAN (ej: eth1, ens19): " LAN_IFACE
-read -p "  Subred VPN WireGuard (ej: 10.255.255.0/24): " WG_SUBNET
-
+read -p "  Interfaz WAN (ej: eth0, ens18): " WAN_IFACE < /dev/tty
+read -p "  Interfaz LAN (ej: eth1, ens19): " LAN_IFACE < /dev/tty
+read -p "  Subred VPN WireGuard (ej: 10.255.255.0/24): " WG_SUBNET < /dev/tty
 WG_SERVER_IP=$(python3 -c "import ipaddress; net=ipaddress.ip_network('$WG_SUBNET',strict=False); print(str(list(net.hosts())[0]))")
 WG_PREFIX=$(python3 -c "import ipaddress; net=ipaddress.ip_network('$WG_SUBNET',strict=False); print(net.prefixlen)")
 
 header "Configuración del panel"
 
-read -p "  Usuario administrador [admin]: " ADMIN_USER
+read -p "  Usuario administrador [admin]: " ADMIN_USER < /dev/tty
 ADMIN_USER=${ADMIN_USER:-admin}
-read -s -p "  Contraseña administrador: " ADMIN_PASS
+read -s -p "  Contraseña administrador: " ADMIN_PASS < /dev/tty
 echo
-read -s -p "  Confirmar contraseña: " ADMIN_PASS2
+read -s -p "  Confirmar contraseña: " ADMIN_PASS2 < /dev/tty
 echo
 [[ "$ADMIN_PASS" != "$ADMIN_PASS2" ]] && die "Las contraseñas no coinciden"
 
-read -p "  Contraseña para MariaDB root: " DB_ROOT_PASS
-read -p "  Puerto API (default: 8000): " API_PORT
+read -p "  Contraseña para MariaDB root: " DB_ROOT_PASS < /dev/tty
+read -p "  Puerto API (default: 8000): " API_PORT < /dev/tty
 API_PORT=${API_PORT:-8000}
 
 INSTALL_DIR="/opt/velar"
@@ -69,7 +68,7 @@ echo "  WAN: $WAN_IFACE | LAN: $LAN_IFACE | VPN: $WG_SUBNET"
 echo "  WireGuard IP servidor: ${WG_SERVER_IP}/${WG_PREFIX}"
 echo "  Directorio: $INSTALL_DIR"
 echo
-read -p "¿Continuar? [s/N]: " CONFIRM
+read -p "¿Continuar? [s/N]: " CONFIRM < /dev/tty
 [[ "${CONFIRM,,}" != "s" ]] && die "Instalación cancelada"
 
 LOG="/var/log/velar-install.log"
@@ -683,7 +682,7 @@ elif [[ -d "$SCRIPT_DIR/dist-api" ]]; then
 elif [[ -d "/root/dist-api" ]]; then
     SOURCE_DIR="/root/dist-api"
 else
-    read -p "  Ruta completa al directorio dist-api: " SOURCE_DIR
+    read -p "  Ruta completa al directorio dist-api: " SOURCE_DIR < /dev/tty
     [[ ! -d "$SOURCE_DIR" ]] && die "Directorio no encontrado: $SOURCE_DIR"
 fi
 
@@ -744,7 +743,7 @@ elif [[ -d "$SCRIPT_DIR/dist-ui" ]]; then
 elif [[ -d "/root/dist-ui" ]]; then
     UI_DIR="/root/dist-ui"
 else
-    read -p "  Ruta completa al directorio dist-ui: " UI_DIR
+    read -p "  Ruta completa al directorio dist-ui: " UI_DIR < /dev/tty
     [[ ! -d "$UI_DIR" ]] && die "Directorio no encontrado: $UI_DIR"
 fi
 ok "Frontend (compilado) encontrado en: $UI_DIR"
@@ -808,21 +807,15 @@ systemctl enable nginx
 # ═════════════════════════════════════════════════════════
 header "19. Watchdog — KEA y API health check"
 # ═════════════════════════════════════════════════════════
-# Cubre casos que Restart=on-failure no puede detectar:
-# 1. API: proceso vivo pero sin responder HTTP
-# 2. KEA: caído porque las VLANs no existían al boot, ahora sí
-# ─────────────────────────────────────────────────────────
 
 cat > /usr/local/bin/velar-watchdog.sh << 'WATCHEOF'
 #!/bin/bash
 LOG=/var/log/velar-watchdog.log
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG"; }
 
-# Rotar log si supera 5MB
 [ -f "$LOG" ] && [ "$(stat -c%s "$LOG" 2>/dev/null || echo 0)" -gt 5242880 ] && \
     mv "$LOG" "${LOG}.1"
 
-# ── 1. API health check ───────────────────────────────────
 if systemctl is-active velar-api --quiet 2>/dev/null; then
     API_TOKEN=$(grep ^API_TOKEN "$INSTALL_DIR/api/.env" 2>/dev/null | cut -d= -f2)
     if ! curl -sf --max-time 3 -H "X-API-Token: ${API_TOKEN}" http://localhost:8000/api/system/status &>/dev/null; then
@@ -834,13 +827,11 @@ if systemctl is-active velar-api --quiet 2>/dev/null; then
     fi
 fi
 
-# ── 2. KEA caído con config válido ───────────────────────
 KEA_SVC=$(systemctl list-units --type=service 2>/dev/null | \
     grep -oE "isc-kea-dhcp4[a-z-]*\.service" | head -1 | sed 's/\.service//')
 KEA_SVC=${KEA_SVC:-isc-kea-dhcp4-server}
 
 if ! systemctl is-active "$KEA_SVC" --quiet 2>/dev/null; then
-    # Limpiar interfaces que ya no existen antes de reintentar
     python3 - << 'PYEOF' >> "$LOG" 2>&1
 import json, subprocess
 from pathlib import Path
