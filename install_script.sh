@@ -312,7 +312,7 @@ mkdir -p /etc/velar /var/lib/velar/appcontrol
 [[ ! -f /etc/velar/appcontrol.json ]] && \
     printf '{"enabled": true, "vlans": {}}\n' > /etc/velar/appcontrol.json
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [[ -f "$VELAR_SRC/ndpi_inspector.py" ]]; then
     cp "$VELAR_SRC/ndpi_inspector.py" /usr/local/bin/
     chmod +x /usr/local/bin/ndpi_inspector.py
