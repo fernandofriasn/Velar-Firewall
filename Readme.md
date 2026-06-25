@@ -80,7 +80,7 @@ That's the whole install. Answer a few prompts, grab coffee, get a router.
 ## 🚀 Quick Install
 
 ```bash
-wget https://raw.githubusercontent.com/your-org/velar/main/velar_install.sh
+wget https://raw.githubusercontent.com/fernandofriasn/Velar-Firewall/main/install_script.sh
 chmod +x velar_install.sh
 sudo ./velar_install.sh
 ```

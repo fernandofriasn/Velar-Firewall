@@ -77,6 +77,30 @@ exec > >(tee -a "$LOG") 2>&1
 echo "Instalación iniciada: $(date)"
 
 # ═════════════════════════════════════════════════════════
+header "0. Descargando Velar desde GitHub"
+# ═════════════════════════════════════════════════════════
+
+VELAR_REPO_USER="fernandofriasn"
+VELAR_REPO_NAME="Velar-Firewall"
+VELAR_BRANCH="main"
+VELAR_SRC="/tmp/velar-src"
+
+command -v curl &>/dev/null || { apt-get update -qq && apt-get install -y -qq curl ca-certificates; }
+
+info "Descargando código fuente desde GitHub (${VELAR_REPO_USER}/${VELAR_REPO_NAME})..."
+rm -rf "$VELAR_SRC" /tmp/velar-src.tar.gz
+mkdir -p "$VELAR_SRC"
+
+if curl -fsSL "https://github.com/${VELAR_REPO_USER}/${VELAR_REPO_NAME}/archive/refs/heads/${VELAR_BRANCH}.tar.gz" \
+    -o /tmp/velar-src.tar.gz; then
+    tar xzf /tmp/velar-src.tar.gz -C "$VELAR_SRC" --strip-components=1
+    rm -f /tmp/velar-src.tar.gz
+    ok "Código descargado desde GitHub (rama ${VELAR_BRANCH})"
+else
+    die "No se pudo descargar el repositorio. Verifica tu conexión a internet."
+fi
+
+# ═════════════════════════════════════════════════════════
 header "1. Paquetes del sistema"
 # ═════════════════════════════════════════════════════════
 
@@ -105,6 +129,40 @@ apt-get install -y -qq \
     linux-headers-$(uname -r) 2>/dev/null || true
 ok "Paquetes base instalados"
 
+# ═════════════════════════════════════════════════════════
+header "2. Docker"
+# ═════════════════════════════════════════════════════════
+
+if ! command -v docker &>/dev/null; then
+    info "Instalando Docker..."
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg | \
+        gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" \
+        > /etc/apt/sources.list.d/docker.list
+    apt-get update -qq
+    apt-get install -y -qq \
+        containerd.io docker-ce docker-ce-cli \
+        docker-buildx-plugin docker-compose-plugin
+    systemctl enable docker
+    ok "Docker instalado"
+else
+    ok "Docker ya instalado: $(docker --version)"
+fi
+
+# ═════════════════════════════════════════════════════════
+header "3. Node.js 20 LTS"
+# ═════════════════════════════════════════════════════════
+
+if ! command -v node &>/dev/null; then
+    info "Instalando Node.js 20 LTS..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - 2>/dev/null
+    apt-get install -y -qq nodejs
+    ok "Node.js $(node --version) instalado"
+else
+    ok "Node.js ya instalado: $(node --version)"
+fi
 
 # ═════════════════════════════════════════════════════════
 header "4. KEA DHCP 2.4.x (repositorio ISC)"
@@ -291,7 +349,11 @@ mkdir -p /etc/velar /var/lib/velar/appcontrol
     printf '{"enabled": true, "vlans": {}}\n' > /etc/velar/appcontrol.json
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "$SCRIPT_DIR/ndpi_inspector.py" ]]; then
+if [[ -f "$VELAR_SRC/ndpi_inspector.py" ]]; then
+    cp "$VELAR_SRC/ndpi_inspector.py" /usr/local/bin/
+    chmod +x /usr/local/bin/ndpi_inspector.py
+    ok "ndpi_inspector.py copiado (desde GitHub)"
+elif [[ -f "$SCRIPT_DIR/ndpi_inspector.py" ]]; then
     cp "$SCRIPT_DIR/ndpi_inspector.py" /usr/local/bin/
     chmod +x /usr/local/bin/ndpi_inspector.py
     ok "ndpi_inspector.py copiado"
@@ -636,7 +698,9 @@ header "17. Velar API (FastAPI)"
 mkdir -p "$INSTALL_DIR/api"
 info "Buscando paquete pre-compilado del backend (dist-api)..."
 
-if [[ -d "$SCRIPT_DIR/dist-api" ]]; then
+if [[ -d "$VELAR_SRC/dist-api" ]]; then
+    SOURCE_DIR="$VELAR_SRC/dist-api"
+elif [[ -d "$SCRIPT_DIR/dist-api" ]]; then
     SOURCE_DIR="$SCRIPT_DIR/dist-api"
 elif [[ -d "/root/dist-api" ]]; then
     SOURCE_DIR="/root/dist-api"
@@ -695,7 +759,9 @@ header "18. Frontend (Vue 3 + nginx)"
 # ═════════════════════════════════════════════════════════
 
 info "Buscando paquete pre-compilado del frontend (dist-ui)..."
-if [[ -d "$SCRIPT_DIR/dist-ui" ]]; then
+if [[ -d "$VELAR_SRC/dist-ui" ]]; then
+    UI_DIR="$VELAR_SRC/dist-ui"
+elif [[ -d "$SCRIPT_DIR/dist-ui" ]]; then
     UI_DIR="$SCRIPT_DIR/dist-ui"
 elif [[ -d "/root/dist-ui" ]]; then
     UI_DIR="/root/dist-ui"
