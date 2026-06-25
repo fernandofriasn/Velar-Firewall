@@ -129,6 +129,10 @@ apt-get install -y -qq \
     linux-headers-$(uname -r) 2>/dev/null || true
 ok "Paquetes base instalados"
 
+# ═════════════════════════════════════════════════════════
+header "4. KEA DHCP 2.4.x (repositorio ISC)"
+# ═════════════════════════════════════════════════════════
+
 KEA_SVC="isc-kea-dhcp4-server"
 
 if ! dpkg -l isc-kea-dhcp4 &>/dev/null; then
@@ -585,9 +589,22 @@ systemctl enable nftables
 systemctl restart nftables
 ok "nftables configurado"
 
-echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-velar.conf
+printf "net.ipv4.ip_forward=1\nnet.netfilter.nf_conntrack_max=1048576\n" \
+    > /etc/sysctl.d/99-velar.conf
 sysctl -p /etc/sysctl.d/99-velar.conf > /dev/null
 ok "IP forwarding habilitado"
+
+# Conntrack: 1M+ conexiones concurrentes. El hashsize se fija aparte
+# porque no es un sysctl real — vive en /sys/module o se carga via modprobe.d
+cat > /etc/modprobe.d/nf_conntrack.conf << 'CTEOF'
+options nf_conntrack hashsize=262144
+CTEOF
+
+# Aplicar de inmediato si el módulo ya está cargado (no requiere reboot)
+if [[ -w /sys/module/nf_conntrack/parameters/hashsize ]]; then
+    echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true
+fi
+ok "Conntrack configurado para 1M+ conexiones concurrentes"
 
 # ═════════════════════════════════════════════════════════
 header "14. KEA DHCP — configuración"
