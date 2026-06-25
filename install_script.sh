@@ -378,7 +378,7 @@ fi
 ssh -i /root/.ssh/id_rsa \
     -o StrictHostKeyChecking=no \
     -o ConnectTimeout=5 \
-    root@127.0.0.1 "echo OK" &>/dev/null && \
+    root@127.0.0.1 "echo OK" < /dev/null &>/dev/null && \
     ok "SSH local funciona" || \
     warn "SSH local no responde — verifica sshd"
 
@@ -389,12 +389,12 @@ header "9. MariaDB — configuración"
 systemctl enable mariadb
 systemctl start mariadb
 
-if mysql -u root -e "SELECT 1" &>/dev/null 2>&1; then
+if mysql -u root -e "SELECT 1" < /dev/null &>/dev/null 2>&1; then
     mysql -u root << SQLEOF
 ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASS}';
 FLUSH PRIVILEGES;
 SQLEOF
-elif mysql -u root -p"${DB_ROOT_PASS}" -e "SELECT 1" &>/dev/null 2>&1; then
+elif mysql -u root -p"${DB_ROOT_PASS}" -e "SELECT 1" < /dev/null &>/dev/null 2>&1; then
     info "MariaDB ya tiene esa contraseña"
 else
     die "No se puede conectar a MariaDB"
@@ -494,7 +494,7 @@ VALUES ('${ADMIN_USER}', '${ADMIN_PASS_HASH}', 'admin');
 SQLEOF
 ok "Schema de router_admin creado"
 
-kea-admin db-init mysql -u root -p "${DB_ROOT_PASS}" -n kea 2>/dev/null || \
+kea-admin db-init mysql -u root -p "${DB_ROOT_PASS}" -n kea < /dev/null 2>/dev/null || \
     warn "KEA schema ya existe — continuando"
 ok "Schema de KEA inicializado"
 
